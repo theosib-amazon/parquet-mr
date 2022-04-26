@@ -341,7 +341,13 @@ public class AvroSchemaConverter {
             }
             @Override
             public Schema convertFIXED_LEN_BYTE_ARRAY(PrimitiveTypeName primitiveTypeName) {
-              if (annotation instanceof LogicalTypeAnnotation.UUIDLogicalTypeAnnotation) {
+              // This check for UUID doesn't work, because org.apache.parquet.io.ColumnIOFactory.visit()
+              // has no way of knowing that STRING (from the desired internal schema) is compatible
+              // with FIXED_LEN_BYTE_ARRAY (from the file schema), and there seems to be no code to 
+              // perform a proper conversion. See https://issues.apache.org/jira/browse/PARQUET-2140
+              // The "false" is inserted here to disable this feature until we can figure out how to
+              // finish adding support for UUIDs.
+              if (false && annotation instanceof LogicalTypeAnnotation.UUIDLogicalTypeAnnotation) {
                 return Schema.create(Schema.Type.STRING);
               } else {
                 int size = parquetType.asPrimitiveType().getTypeLength();
