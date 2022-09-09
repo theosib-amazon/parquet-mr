@@ -93,10 +93,34 @@ public class DictionaryValuesReader extends ValuesReader {
     }
   }
 
+  public void readFloats(float[] arr, int offset, int len) {
+    try {
+      int s = offset;
+      int e = offset + len;
+      for (int i = s; i < e; i++) {
+        arr[i] = dictionary.decodeToFloat(decoder.readInt());
+      }
+    } catch (IOException e) {
+      throw new ParquetDecodingException(e);
+    }
+  }
+
   @Override
   public double readDouble() {
     try {
       return dictionary.decodeToDouble(decoder.readInt());
+    } catch (IOException e) {
+      throw new ParquetDecodingException(e);
+    }
+  }
+
+  public void readDoubles(double[] arr, int offset, int len) {
+    try {
+      int s = offset;
+      int e = offset + len;
+      for (int i = s; i < e; i++) {
+        arr[i] = dictionary.decodeToDouble(decoder.readInt());
+      }
     } catch (IOException e) {
       throw new ParquetDecodingException(e);
     }
@@ -111,6 +135,19 @@ public class DictionaryValuesReader extends ValuesReader {
     }
   }
 
+  public void readIntegers(int[] arr, int offset, int len) {
+    try {
+      decoder.readInts(arr, offset, len);
+      int s = offset;
+      int e = offset + len;
+      for (int i = s; i < e; i++) {
+        arr[i] = dictionary.decodeToInt(arr[i]);
+      }
+    } catch (IOException e) {
+      throw new ParquetDecodingException(e);
+    }
+  }
+
   @Override
   public long readLong() {
     try {
@@ -120,12 +157,34 @@ public class DictionaryValuesReader extends ValuesReader {
     }
   }
 
-  @Override
-  public void skip() {
+  public void readLongs(long[] arr, int offset, int len) {
     try {
-      decoder.readInt(); // Type does not matter as we are just skipping dictionary keys
+      int s = offset;
+      int e = offset + len;
+      for (int i = s; i < e; i++) {
+        arr[i] = dictionary.decodeToLong(decoder.readInt());
+      }
     } catch (IOException e) {
       throw new ParquetDecodingException(e);
     }
   }
+
+  @Override
+  public void skip() {
+    try {
+      decoder.skip(); // Type does not matter as we are just skipping dictionary keys
+    } catch (IOException e) {
+      throw new ParquetDecodingException(e);
+    }
+  }
+
+  @Override
+  public void skip(int n) {
+    try {
+      decoder.skip(n); // Type does not matter as we are just skipping dictionary keys
+    } catch (IOException e) {
+      throw new ParquetDecodingException(e);
+    }
+  }
+
 }

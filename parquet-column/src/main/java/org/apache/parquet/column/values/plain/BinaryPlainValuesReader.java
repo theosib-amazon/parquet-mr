@@ -36,7 +36,8 @@ public class BinaryPlainValuesReader extends ValuesReader {
   @Override
   public Binary readBytes() {
     try {
-      int length = BytesUtils.readIntLittleEndian(in);
+//      int length = BytesUtils.readIntLittleEndian(in);
+      int length = in.readInt();
       return Binary.fromConstantByteBuffer(in.slice(length));
     } catch (IOException | RuntimeException e) {
       throw new ParquetDecodingException("could not read bytes at offset " + in.position(), e);
@@ -46,7 +47,8 @@ public class BinaryPlainValuesReader extends ValuesReader {
   @Override
   public void skip() {
     try {
-      int length = BytesUtils.readIntLittleEndian(in);
+//      int length = BytesUtils.readIntLittleEndian(in);
+      int length = in.readInt();
       in.skipFully(length);
     } catch (IOException | RuntimeException e) {
       throw new ParquetDecodingException("could not skip bytes at offset " + in.position(), e);

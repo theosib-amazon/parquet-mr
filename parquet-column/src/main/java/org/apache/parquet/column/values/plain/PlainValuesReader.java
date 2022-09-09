@@ -33,12 +33,13 @@ import org.slf4j.LoggerFactory;
 abstract public class PlainValuesReader extends ValuesReader {
   private static final Logger LOG = LoggerFactory.getLogger(PlainValuesReader.class);
 
-  protected LittleEndianDataInputStream in;
+  protected ByteBufferInputStream in;
 
   @Override
   public void initFromPage(int valueCount, ByteBufferInputStream stream) throws IOException {
     LOG.debug("init from page at offset {} for length {}", stream.position(), stream.available());
-    this.in = new LittleEndianDataInputStream(stream.remainingStream());
+    // No need for "remainingStream()" since the caller is done with the stream
+    this.in = stream;
   }
 
   @Override
@@ -47,10 +48,7 @@ abstract public class PlainValuesReader extends ValuesReader {
   }
 
   void skipBytesFully(int n) throws IOException {
-    int skipped = 0;
-    while (skipped < n) {
-      skipped += in.skipBytes(n - skipped);
-    }
+    in.skipFully(n);
   }
 
   public static class DoublePlainValuesReader extends PlainValuesReader {
@@ -72,6 +70,16 @@ abstract public class PlainValuesReader extends ValuesReader {
         throw new ParquetDecodingException("could not read double", e);
       }
     }
+
+    @Override
+    public void readDoubles(double[] arr, int offset, int len) {
+      try {
+        in.readDoubles(arr, offset, len);
+      } catch (IOException e) {
+        throw new ParquetDecodingException("could not read double", e);
+      }
+    }
+
   }
 
   public static class FloatPlainValuesReader extends PlainValuesReader {
@@ -93,6 +101,15 @@ abstract public class PlainValuesReader extends ValuesReader {
         throw new ParquetDecodingException("could not read float", e);
       }
     }
+
+    @Override
+    public void readFloats(float[] arr, int offset, int len) {
+      try {
+        in.readFloats(arr, offset, len);
+      } catch (IOException e) {
+        throw new ParquetDecodingException("could not read double", e);
+      }
+    }
   }
 
   public static class IntegerPlainValuesReader extends PlainValuesReader {
@@ -100,7 +117,7 @@ abstract public class PlainValuesReader extends ValuesReader {
     @Override
     public void skip(int n) {
       try {
-        in.skipBytes(n * 4);
+        skipBytesFully(n * 4);
       } catch (IOException e) {
         throw new ParquetDecodingException("could not skip " + n + " ints", e);
       }
@@ -114,6 +131,20 @@ abstract public class PlainValuesReader extends ValuesReader {
         throw new ParquetDecodingException("could not read int", e);
       }
     }
+
+    @Override
+    public void readIntegers(int[] arr, int offset, int len) {
+      try {
+        in.readInts(arr, offset, len);
+      } catch (IOException e) {
+        throw new ParquetDecodingException("could not read double", e);
+      }
+    }
+
+    @Override
+    public int availableIntegers() {
+      return in.available() >> 2;
+    }
   }
 
   public static class LongPlainValuesReader extends PlainValuesReader {
@@ -121,7 +152,7 @@ abstract public class PlainValuesReader extends ValuesReader {
     @Override
     public void skip(int n) {
       try {
-        in.skipBytes(n * 8);
+        skipBytesFully(n * 8);
       } catch (IOException e) {
         throw new ParquetDecodingException("could not skip " + n + " longs", e);
       }
@@ -133,6 +164,15 @@ abstract public class PlainValuesReader extends ValuesReader {
         return in.readLong();
       } catch (IOException e) {
         throw new ParquetDecodingException("could not read long", e);
+      }
+    }
+
+    @Override
+    public void readLongs(long[] arr, int offset, int len) {
+      try {
+        in.readLongs(arr, offset, len);
+      } catch (IOException e) {
+        throw new ParquetDecodingException("could not read double", e);
       }
     }
   }

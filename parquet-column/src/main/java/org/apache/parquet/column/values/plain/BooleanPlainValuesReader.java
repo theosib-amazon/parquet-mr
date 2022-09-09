@@ -43,7 +43,12 @@ public class BooleanPlainValuesReader extends ValuesReader {
    */
   @Override
   public boolean readBoolean() {
-    return in.readInteger() == 0 ? false : true;
+    return in.readBoolean();
+  }
+
+  @Override
+  public void readBooleans(boolean[] arr, int offset, int len) {
+    in.readBooleans(arr, offset, len);
   }
 
   /**
@@ -52,7 +57,12 @@ public class BooleanPlainValuesReader extends ValuesReader {
    */
   @Override
   public void skip() {
-    in.readInteger();
+    in.skip();
+  }
+
+  @Override
+  public void skip(int n) {
+    in.skip(n);
   }
 
   /**

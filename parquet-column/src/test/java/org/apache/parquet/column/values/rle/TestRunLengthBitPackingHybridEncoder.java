@@ -24,7 +24,9 @@ import java.io.ByteArrayInputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.nio.ByteBuffer;
 
+import org.apache.parquet.bytes.ByteBufferInputStream;
 import org.junit.Test;
 
 import org.apache.parquet.bytes.DirectByteBufferAllocator;
@@ -294,7 +296,7 @@ public class TestRunLengthBitPackingHybridEncoder {
 	// bit width 2.
 	bytes[0] = (1 << 1 )| 1;
 	bytes[1] = (1 << 0) | (2 << 2) | (3 << 4);
-    ByteArrayInputStream stream = new ByteArrayInputStream(bytes);
+    ByteBufferInputStream stream = new ByteBufferInputStream(ByteBuffer.wrap(bytes));
     RunLengthBitPackingHybridDecoder decoder = new RunLengthBitPackingHybridDecoder(2, stream);
     assertEquals(decoder.readInt(), 1);
     assertEquals(decoder.readInt(), 2);

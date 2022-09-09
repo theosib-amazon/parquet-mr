@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.io.InputStream;
 
 import org.apache.parquet.Preconditions;
+import org.apache.parquet.bytes.ByteBufferInputStream;
 import org.apache.parquet.bytes.BytesUtils;
 import org.apache.parquet.column.values.bitpacking.BytePacker;
 import org.apache.parquet.column.values.bitpacking.Packer;
@@ -37,16 +38,19 @@ import org.slf4j.LoggerFactory;
 public class RunLengthBitPackingHybridDecoder {
   private static final Logger LOG = LoggerFactory.getLogger(RunLengthBitPackingHybridDecoder.class);
 
-  private static enum MODE { RLE, PACKED }
-
   private final int bitWidth;
   private final BytePacker packer;
-  private final InputStream in;
+  private final ByteBufferInputStream in;
+  boolean packed_mode;
 
-  private MODE mode;
   private int currentCount;
   private int currentValue;
   private int[] currentBuffer;
+
+  // We look ahead one group or run in order so that availableIntegers reports
+  // a larger count.
+  private int nextHeader = -1;
+  private int extraCount = 0;
 
   public RunLengthBitPackingHybridDecoder(int bitWidth, InputStream in) {
     LOG.debug("decoding bitWidth {}", bitWidth);
@@ -54,7 +58,22 @@ public class RunLengthBitPackingHybridDecoder {
     Preconditions.checkArgument(bitWidth >= 0 && bitWidth <= 32, "bitWidth must be >= 0 and <= 32");
     this.bitWidth = bitWidth;
     this.packer = Packer.LITTLE_ENDIAN.newBytePacker(bitWidth);
-    this.in = in;
+    this.in = (ByteBufferInputStream)in;
+  }
+
+  public int availableIntegers() {
+    if (currentCount == 0) {
+      // If we've used up the run or group, see if we can decode the next one
+      // from the input stream.
+      try {
+        if (in.available() < 1) return 0;
+        readNext();
+      } catch (IOException x) {
+        return 0;
+      }
+    }
+
+    return currentCount + extraCount;
   }
 
   public int readInt() throws IOException {
@@ -63,30 +82,105 @@ public class RunLengthBitPackingHybridDecoder {
     }
     -- currentCount;
     int result;
-    switch (mode) {
-    case RLE:
-      result = currentValue;
-      break;
-    case PACKED:
-      result = currentBuffer[currentBuffer.length - 1 - currentCount];
-      break;
-    default:
-      throw new ParquetDecodingException("not a valid mode " + mode);
+    if (packed_mode) {
+      return currentBuffer[currentBuffer.length - 1 - currentCount];
+    } else {
+      return currentValue;
     }
-    return result;
+  }
+
+  public boolean readBoolean() throws IOException {
+    return readInt() != 0;
+  }
+
+  public void readBooleans(boolean[] arr, int offset, int len) throws IOException {
+    int s = offset;
+    int e = offset + len;
+    for (int i=s; i<e; i++) {
+      arr[i] = readInt() != 0;
+    }
+  }
+
+
+  public void skip() throws IOException {
+    if (currentCount == 0) {
+      readNext();
+    }
+    -- currentCount;
+  }
+
+  public void skip(int n) throws IOException {
+    while (true) {
+      if (n <= currentCount) {
+        // If we need to skip no more than the current group/run, then
+        // decrement the count and exit.
+        currentCount -= n;
+        return;
+      } else {
+        // If we need to skip more than the current group/run, then
+        // deduct the remaining count and then fetch the next group/run.
+        n -= currentCount;
+        //currentCount = 0;  // Semantically, this happens but is handled by readNext()
+        readNext();
+      }
+    }
+  }
+
+  // Heavily optimized array read method.
+  public void readInts(int[] arr, int offset, int len) throws IOException {
+    if (len < 1) return;
+    if (currentCount == 0) readNext();
+
+    int ix = offset;
+    while (true) {
+      if (len <= currentCount) {
+        // If we need no more values than the current run/group, then copy them and exit
+        if (!packed_mode) {
+          int e = ix+len;
+          for (int i=ix; i<e; i++) arr[i] = currentValue;
+        } else {
+          System.arraycopy(currentBuffer, currentBuffer.length - currentCount, arr, ix, len);
+        }
+        currentCount -= len;
+        return;
+      } else {
+        // If we need more values than the current run/group, then copy what we have and then
+        // fetch more.
+        if (!packed_mode) {
+          int e = ix + currentCount;
+          for (int i=ix; i<e; i++) arr[i] = currentValue;
+          ix = e;
+        } else {
+          System.arraycopy(currentBuffer, currentBuffer.length - currentCount, arr, ix, currentCount);
+          ix += currentCount;
+        }
+        len -= currentCount;
+        //currentCount = 0;  // Semantically, this happens but is handled by readNext()
+        readNext();
+      }
+    }
   }
 
   private void readNext() throws IOException {
     Preconditions.checkArgument(in.available() > 0, "Reading past RLE/BitPacking stream.");
-    final int header = BytesUtils.readUnsignedVarInt(in);
-    mode = (header & 1) == 0 ? MODE.RLE : MODE.PACKED;
-    switch (mode) {
-    case RLE:
+
+    int header;
+    if (nextHeader != -1) {
+      // If we pre-fetched a header, use it now.
+      header = nextHeader;
+      nextHeader = -1;
+    } else {
+      // Otherwise, fetch a header byte
+      header = in.readUnsignedVarInt();
+    }
+    extraCount = 0;
+
+    packed_mode = (header & 1) != 0;
+    if (!packed_mode) {
       currentCount = header >>> 1;
       LOG.debug("reading {} values RLE", currentCount);
-      currentValue = BytesUtils.readIntLittleEndianPaddedOnBitWidth(in, bitWidth);
-      break;
-    case PACKED:
+      currentValue = in.readIntLittleEndianPaddedOnBitWidth(bitWidth);
+    } else {
       int numGroups = header >>> 1;
       currentCount = numGroups * 8;
       LOG.debug("reading {} values BIT PACKED", currentCount);
@@ -95,13 +189,23 @@ public class RunLengthBitPackingHybridDecoder {
       // At the end of the file RLE data though, there might not be that many bytes left.
       int bytesToRead = (int)Math.ceil(currentCount * bitWidth / 8.0);
       bytesToRead = Math.min(bytesToRead, in.available());
-      new DataInputStream(in).readFully(bytes, 0, bytesToRead);
+      in.readFully(bytes, 0, bytesToRead);
       for (int valueIndex = 0, byteIndex = 0; valueIndex < currentCount; valueIndex += 8, byteIndex += bitWidth) {
+        // It's faster to use an array with unpack8Values than to use a ByteBuffer.
         packer.unpack8Values(bytes, byteIndex, currentBuffer, valueIndex);
       }
-      break;
-    default:
-      throw new ParquetDecodingException("not a valid mode " + mode);
+    }
+
+    // Look ahead to see if we can get another header byte. We do this so that availableIntegers()
+    // can report a larger value. It would be nice to read even further ahead, but this is a relatively
+    // uninvasive change.
+    if (in.available() > 0) {
+      nextHeader = in.readUnsignedVarInt();
+      if ((nextHeader & 1) == 0) {
+        extraCount = nextHeader >>> 1;
+      } else {
+        extraCount = (nextHeader >>> 1) * 8;
+      }
     }
   }
 }

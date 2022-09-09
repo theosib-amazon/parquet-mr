@@ -28,10 +28,22 @@ import org.apache.parquet.column.values.ValuesReader;
  * Mainly used to read definition levels when the only possible value is 0
  */
 public class ZeroIntegerValuesReader extends ValuesReader {
-  
+
+  @Override
+  public int availableIntegers() {
+    return Integer.MAX_VALUE;
+  }
+
   @Override
   public int readInteger() {
     return 0;
+  }
+
+  @Override
+  public void readIntegers(int[] arr, int offset, int len) {
+    int s = offset;
+    int e = offset + len;
+    for (int i=s; i<e; i++) arr[i] = 0;
   }
 
   @Override

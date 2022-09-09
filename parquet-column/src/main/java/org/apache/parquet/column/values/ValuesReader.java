@@ -151,6 +151,20 @@ public abstract class ValuesReader {
   }
 
   /**
+   * Default method to read array of booleans
+   * @param arr array to put values into
+   * @param offset starting position in array
+   * @param len number of values to read
+   */
+  public void readBooleans(boolean[] arr, int offset, int len) {
+    int s = offset;
+    int e = len + offset;
+    for (int i = s; i < e; i++) {
+      arr[i] = readBoolean();
+    }
+  }
+
+  /**
    * @return the next Binary from the page
    */
   public Binary readBytes() {
@@ -165,10 +179,39 @@ public abstract class ValuesReader {
   }
 
   /**
+   * Default method to read array of floats
+   * @param arr array to put values into
+   * @param offset starting position in array
+   * @param len number of values to read
+   */
+  public void readFloats(float[] arr, int offset, int len) {
+    int s = offset;
+    int e = len + offset;
+    for (int i = s; i < e; i++) {
+      arr[i] = readFloat();
+    }
+  }
+
+
+  /**
    * @return the next double from the page
    */
   public double readDouble() {
     throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Default method to read array of doubles
+   * @param arr array to put values into
+   * @param offset starting position in array
+   * @param len number of values to read
+   */
+  public void readDoubles(double[] arr, int offset, int len) {
+    int s = offset;
+    int e = len + offset;
+    for (int i = s; i < e; i++) {
+      arr[i] = readDouble();
+    }
   }
 
   /**
@@ -179,11 +222,50 @@ public abstract class ValuesReader {
   }
 
   /**
+   * Default method to read array of integers
+   * @param arr array to put values into
+   * @param offset starting position in array
+   * @param len number of values to read
+   */
+  public void readIntegers(int[] arr, int offset, int len) {
+    int s = offset;
+    int e = len + offset;
+    for (int i = s; i < e; i++) {
+      arr[i] = readInteger();
+    }
+  }
+
+
+  /**
+   * Report number of integer values available from source
+   * @return number of available integers
+   */
+  public int availableIntegers() {
+    throw new UnsupportedOperationException();
+  }
+
+
+  /**
    * @return the next long from the page
    */
   public long readLong() {
     throw new UnsupportedOperationException();
   }
+
+  /**
+   * Default method to read array of longs
+   * @param arr array to put values into
+   * @param offset starting position in array
+   * @param len number of values to read
+   */
+  public void readLongs(long[] arr, int offset, int len) {
+    int s = offset;
+    int e = len + offset;
+    for (int i = s; i < e; i++) {
+      arr[i] = readLong();
+    }
+  }
+
 
   /**
    * Skips the next value in the page

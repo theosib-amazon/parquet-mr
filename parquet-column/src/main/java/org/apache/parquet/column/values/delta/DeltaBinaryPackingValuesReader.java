@@ -61,7 +61,8 @@ public class DeltaBinaryPackingValuesReader extends ValuesReader {
     this.in = stream;
     long startPos = in.position();
     this.config = DeltaBinaryPackingConfig.readConfig(in);
-    this.totalValueCount = BytesUtils.readUnsignedVarInt(in);
+//    this.totalValueCount = BytesUtils.readUnsignedVarInt(in);
+    this.totalValueCount = in.readUnsignedVarInt();
     allocateValuesBuffer();
     bitWidths = new int[config.miniBlockNumInABlock];
 
@@ -105,9 +106,33 @@ public class DeltaBinaryPackingValuesReader extends ValuesReader {
   }
 
   @Override
+  public void readIntegers(int[] arr, int offset, int len) {
+    if (valuesRead + len > totalValueCount) {
+      // Throw exception if trying to read more values than remain
+      throw new ParquetDecodingException("not enough values to read, total value count is " + totalValueCount + ", requested " + len);
+    }
+    // Use loop to copy values since a type conversion is necessary.
+    int s = offset;
+    int e = offset + len;
+    for (int i = s; i < e; i++) {
+      arr[i] = (int) valuesBuffer[valuesRead++];
+    }
+  }
+
+  @Override
   public long readLong() {
     checkRead();
     return valuesBuffer[valuesRead++];
+  }
+
+  @Override
+  public void readLongs(long[] arr, int offset, int len) {
+    if (valuesRead + len > totalValueCount) {
+      // Throw exception if trying to read more values than remain
+      throw new ParquetDecodingException("not enough values to read, total value count is " + totalValueCount + ", requested " + len);
+    }
+    System.arraycopy(valuesBuffer, valuesRead, arr, offset, len);
+    valuesRead += len;
   }
 
   private void checkRead() {

@@ -39,12 +39,18 @@ public class RunLengthBitPackingHybridValuesReader extends ValuesReader {
 
   @Override
   public void initFromPage(int valueCountL, ByteBufferInputStream stream) throws IOException {
-    int length = BytesUtils.readIntLittleEndian(stream);
+//    int length = BytesUtils.readIntLittleEndian(stream);
+    int length = stream.readInt();
     this.decoder = new RunLengthBitPackingHybridDecoder(
         bitWidth, stream.sliceStream(length));
 
     // 4 is for the length which is stored as 4 bytes little endian
     updateNextOffset(length + 4);
+  }
+
+  @Override
+  public int availableIntegers() {
+    return decoder.availableIntegers();
   }
 
   @Override
@@ -55,14 +61,50 @@ public class RunLengthBitPackingHybridValuesReader extends ValuesReader {
       throw new ParquetDecodingException(e);
     }
   }
-  
+
+  @Override
+  public void readIntegers(int[] arr, int offset, int len) {
+    try {
+      decoder.readInts(arr, offset, len);
+    } catch (IOException e) {
+      throw new ParquetDecodingException(e);
+    }
+  }
+
+
   @Override
   public boolean readBoolean() {
-    return readInteger() == 0 ? false : true;
+    try {
+      return decoder.readBoolean();
+    } catch (IOException e) {
+      throw new ParquetDecodingException(e);
+    }
+  }
+
+  @Override
+  public void readBooleans(boolean[] arr, int offset, int len) {
+    try {
+      decoder.readBooleans(arr, offset, len);
+    } catch (IOException e) {
+      throw new ParquetDecodingException(e);
+    }
   }
 
   @Override
   public void skip() {
-    readInteger();
+    try {
+      decoder.skip(); // Type does not matter as we are just skipping dictionary keys
+    } catch (IOException e) {
+      throw new ParquetDecodingException(e);
+    }
+  }
+
+  @Override
+  public void skip(int n) {
+    try {
+      decoder.skip(n); // Type does not matter as we are just skipping dictionary keys
+    } catch (IOException e) {
+      throw new ParquetDecodingException(e);
+    }
   }
 }
